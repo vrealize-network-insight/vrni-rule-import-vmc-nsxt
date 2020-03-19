@@ -212,7 +212,7 @@ class VMCRuleImport():
 
     def creatservicesdefinitions(self):
         self.services = []
-        for line in glob.glob(os.path.join(self.rulefolder,"F*.xml")):
+        for line in glob.glob(os.path.join(self.rulefolder,"*FIRE*.xml")):
             dom = minidom.parse(line)
             services = [ x.getElementsByTagName('name')[0].firstChild.nodeValue for x in dom.getElementsByTagName('services')[0].getElementsByTagName('service') ]
             self.services.extend(services)
@@ -236,7 +236,7 @@ class VMCRuleImport():
 
     def parsetiers(self):
         self.newsecgroups = []
-        for line in glob.glob(os.path.join(self.rulefolder,"F*.xml")):
+        for line in glob.glob(os.path.join(self.rulefolder,"*FIRE*.xml")):
             dom = minidom.parse(line)
             sourcetier = dom.getElementsByTagName('sources')[0].getElementsByTagName('source')[0].getElementsByTagName('name')[0].firstChild.nodeValue
             destinationtier = dom.getElementsByTagName('destinations')[0].getElementsByTagName('destination')[0].getElementsByTagName('name')[0].firstChild.nodeValue
@@ -245,7 +245,7 @@ class VMCRuleImport():
         self.newsecgroups = list(dict.fromkeys(self.newsecgroups))
 
     def createrules(self):
-        for line in glob.glob(os.path.join(self.rulefolder,"F*.xml")):
+        for line in glob.glob(os.path.join(self.rulefolder,"*FIRE*.xml")):
             servicespatharray = []
             sourcepath = None
             destinationpath = None
