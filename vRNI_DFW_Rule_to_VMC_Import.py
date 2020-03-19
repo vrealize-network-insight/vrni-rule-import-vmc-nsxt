@@ -29,6 +29,7 @@ class VMCRuleImport():
             self.refreshtoken = None
             self.rulefolder = None
             self.applicationname = None
+            self.enablerules = True
 
     def main(self):
         """Starting point for import process"""
@@ -40,6 +41,7 @@ class VMCRuleImport():
         parser.add_argument('--refreshtoken', '-r', help='Generated API token')
         parser.add_argument('--verbose', '-v', action='store_true', help='Verbose output (print status messages)')
         parser.add_argument('--appname', '-a', help='Name of application for imported rules without spaces')
+        parser.add_argument('--enablerules', action='store_false', help='Creates enabled firewall rules.  Default is disabled.')
         args = parser.parse_args()
         if args.help:
             parser.print_help()
@@ -51,6 +53,7 @@ class VMCRuleImport():
         self.refreshtoken = args.refreshtoken
         self.rulefolder = args.rulefolder
         self.applicationname = args.appname
+        self.enablerules = args.enablerules
 
         if not self.orgid:
             self.orgid = input('Please provide organization ID:  ')
@@ -91,7 +94,6 @@ class VMCRuleImport():
             if response.status_code != 200:
                 print("Unable to obtain access token. Response: ", response.status_code, "\n")
 
-
     def getproxyurls(self):
         infourl = 'https://vmc.vmware.com/vmc/api/orgs/%s/sddcs/%s' %(self.orgid, self.sddcid)
         headers = {'csp-auth-token': self.token, 'content-type': 'application/json'}
@@ -107,7 +109,6 @@ class VMCRuleImport():
             print(self.nsxpolicymanagerurl, '\n')
             if response.status_code != 200:
                 print("Unable get URLs. Response: ", response.status_code, "\n")
-
 
     def getfirewallsectionids(self):
         infourl = '%s/policy/api/v1/infra/domains/cgw/communication-maps' %(self.srevproxyurl)
@@ -201,7 +202,6 @@ class VMCRuleImport():
             headers = {'Authorization': str('Bearer ' + self.token), 'content-type': 'application/json'}
             payload = {"precedence": "1", "category": "Application", "resource_type": "CommunicationMap", "id": self.applicationid, "display_name": self.applicationname}
             response = requests.put(infourl,headers=headers,data=json.dumps(payload))
-            print(infourl,headers,payload)
             fwrulesection = json.loads(response.text)
             self.sectionid = fwrulesection["id"]
             if self.verbose:
@@ -270,7 +270,7 @@ class VMCRuleImport():
                         servicespatharray.append(item.get('Path'))
             infourl = '%spolicy/api/v1/infra/domains/cgw/communication-maps/%s/communication-entries/%s' %(self.nsxpolicymanagerurl, self.applicationid, rulename)
             headers = {'Authorization': str('Bearer ' + self.token), 'content-type': 'application/json'}
-            payload = {"description": "comm entry", "display_name": rulename, "sequence_number": 1, "source_groups": sourcepath, "destination_groups": destinationpath, "services": servicespatharray, "action": "ALLOW"}
+            payload = {"description": "comm entry", "display_name": rulename, "sequence_number": 1, "source_groups": sourcepath, "destination_groups": destinationpath, "services": servicespatharray, "action": "ALLOW", 'disabled': self.enablerules}
             response = requests.put(infourl,headers=headers,data=json.dumps(payload))
             if self.verbose:
                 if response.status_code == 200:
