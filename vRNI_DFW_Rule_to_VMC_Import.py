@@ -135,7 +135,7 @@ class VMCRuleImport():
         self.secgrouplist = []
         self.secgroupids = []
         for item in d.get("results"):
-            if item.get('id').startswith('vRNI-Import'):
+            if item.get('id').endswith('-vRNI-Import-Tier'):
                 secid = item.get('id')
                 secpath = item.get('path')
                 self.secgrouplist.append({'section id': secid, 'Path': secpath})
@@ -156,7 +156,7 @@ class VMCRuleImport():
         self.serviceslookup =[]
         self.existingservices =[]
         for rule in existingservices:
-            if rule.get('id').startswith("vRNI-Import-"):
+            if rule.get('id').endswith("-vRNI-Import"):
                 self.existingservices.append(rule.get('id'))
                 ruleid = rule.get('id')
                 path = rule.get('path')
@@ -177,7 +177,7 @@ class VMCRuleImport():
         if self.verbose:
             print("******* \n Creating security groups. Please note: Created security groups are not populated with members. You will need to add Virtual Machines and IPs to created security groups as necessary. \n******* \n")
         for tier in self.newsecgroups:
-            tiername = "vRNI-Import-Tier-" + tier
+            tiername = tier + "-vRNI-Import-Tier"
             if tiername in self.secgroupids:
                 print("Security group for ", tiername, " already created.  Skipping. \n")
                 continue
@@ -193,7 +193,7 @@ class VMCRuleImport():
                         print("Security Group Created: " + tiername, "\n")
 
     def createfirewallrulesection(self):
-        self.applicationid = 'vRNIImport-' + self.applicationname
+        self.applicationid = self.applicationname + "-vRNIImport"
         if self.applicationid in self.communicationmaps:
             if self.verbose:
                 print("Application communication map already exists: ", self.applicationid , ", skipping to create groups \n")
@@ -220,7 +220,7 @@ class VMCRuleImport():
         for service in self.services:
             service = service.split()
             service = service[0]
-            serviceid = "vRNI-Import-" + service
+            serviceid =  service + "-vRNI-Import"
             if serviceid not in self.existingservices:
                 splitservice = service.split('-', 2)
                 infourl = '%spolicy/api/v1/infra/services/%s' %(self.nsxpolicymanagerurl, serviceid)
@@ -247,30 +247,33 @@ class VMCRuleImport():
     def createrules(self):
         for line in glob.glob(os.path.join(self.rulefolder,"*FIRE*.xml")):
             servicespatharray = []
+            scope = []
             sourcepath = None
             destinationpath = None
             dom = minidom.parse(line)
-            rulename = "vRNI-Import-" + dom.getElementsByTagName("name")[0].firstChild.nodeValue
+            rulename =  dom.getElementsByTagName("name")[0].firstChild.nodeValue + "-vRNI-Import"
             rulename = rulename.replace('[', '').replace(']', '').replace(' ', '')
-            source = "vRNI-Import-Tier-" + dom.getElementsByTagName('sources')[0].getElementsByTagName('source')[0].getElementsByTagName('name')[0].firstChild.nodeValue.replace(" ", "-")  
+            source =  dom.getElementsByTagName('sources')[0].getElementsByTagName('source')[0].getElementsByTagName('name')[0].firstChild.nodeValue.replace(" ", "-") + "-vRNI-Import-Tier" 
             for item in self.secgrouplist:
                 if source == item.get('section id'):
                     sourcepath = [item.get('Path')]
-            destination = "vRNI-Import-Tier-" + dom.getElementsByTagName('destinations')[0].getElementsByTagName('destination')[0].getElementsByTagName('name')[0].firstChild.nodeValue.replace(" ", "-")
+                    scope.append(sourcepath[0])
+            destination =  dom.getElementsByTagName('destinations')[0].getElementsByTagName('destination')[0].getElementsByTagName('name')[0].firstChild.nodeValue.replace(" ", "-") + "-vRNI-Import-Tier"
             for item in self.secgrouplist:
                 if destination == item.get('section id'):
                     destinationpath = [item.get('Path')]
+                    scope.append(destinationpath[0])
             services = [ x.getElementsByTagName('name')[0].firstChild.nodeValue for x in dom.getElementsByTagName('services')[0].getElementsByTagName('service') ]
             for item in services:
                 service = item.split()
                 service = service[0]
-                serviceid = "vRNI-Import-" + service
+                serviceid = service + "-vRNI-Import"
                 for item in self.serviceslookup:
                     if serviceid == item.get('id'):
                         servicespatharray.append(item.get('Path'))
             infourl = '%spolicy/api/v1/infra/domains/cgw/communication-maps/%s/communication-entries/%s' %(self.nsxpolicymanagerurl, self.applicationid, rulename)
             headers = {'Authorization': str('Bearer ' + self.token), 'content-type': 'application/json'}
-            payload = {"description": "comm entry", "display_name": rulename, "sequence_number": 1, "source_groups": sourcepath, "destination_groups": destinationpath, "services": servicespatharray, "action": "ALLOW", 'disabled': self.enablerules}
+            payload = {"description": "comm entry", "display_name": rulename, "sequence_number": 1, "source_groups": sourcepath, "destination_groups": destinationpath, "services": servicespatharray, "action": "ALLOW", 'disabled': self.enablerules, "scope": scope}
             response = requests.put(infourl,headers=headers,data=json.dumps(payload))
             if self.verbose:
                 if response.status_code == 200:
