@@ -16,8 +16,10 @@ import requests
 from requests_toolbelt.utils import dump
 import glob
 import os
+from os import listdir, path
 from xml.dom import minidom
 from xml.dom.minidom import parse, parseString
+import xml.etree.ElementTree as ET
 
 class VMCRuleImport():
     """Main class for importing VMC DFW Rules"""
@@ -67,6 +69,7 @@ class VMCRuleImport():
             self.applicationname = input('Please input name of application for imported rules without spaces:  ')
 
     ### Functions run order ###
+        self.othersphysicalhandling()
         self.gettoken()
         self.getproxyurls()
         self.getfirewallsectionids()
@@ -227,12 +230,14 @@ class VMCRuleImport():
                 headers = {'Authorization': str('Bearer ' + self.token), 'content-type': 'application/json'}
                 payload = {"is_default": "true", "service_entries": [{"l4_protocol": splitservice[1], "source_ports": [], "destination_ports": [splitservice[2]], "resource_type": "L4PortSetServiceEntry", "id": serviceid, "display_name": serviceid, "marked_for_delete": 'false', "_protection": "NOT_PROTECTED", "_revision": 0}]}
                 response = requests.patch(infourl,headers=headers,data=json.dumps(payload))
-                if response.status_code == 200:
-                    print("Created service ", serviceid)
-                else:
-                    print("Failed to create service ", serviceid, ". Response:" , response.status_code, "\n")
+                if self.verbose:
+                    if response.status_code == 200:
+                        print("Created service ", serviceid)
+                    else:
+                        print("Failed to create service ", serviceid, ". Response:" , response.status_code, "\n")
             else:
-                print("Service for ", serviceid, 'already exists, skipping.\n')
+                if self.verbose:
+                    print("Service for ", serviceid, 'already exists, skipping.\n')
 
     def parsetiers(self):
         self.newsecgroups = []
@@ -280,6 +285,24 @@ class VMCRuleImport():
                     print("Created rule ", rulename, "\n")
                 else:
                     print("Failed to create rule ", rulename, ". Response: ", response.status_code,"\n")
+
+    def othersphysicalhandling(self):
+        files = [os.path.join(self.rulefolder, f) for f in listdir(self.rulefolder) if f.startswith("UFIRE") or f.startswith("FIRE")]
+        for file in files:
+            tree = ET.parse(file)
+            dom = minidom.parse(file)
+            root = tree.getroot()
+            for elem in root.iter('source'):
+                for sourcename in elem.iter('name'):
+                    if sourcename.text == 'Others_Physical':
+                        sourcename.text = dom.getElementsByTagName('destinations')[0].getElementsByTagName('destination')[0].getElementsByTagName('name')[0].firstChild.nodeValue.replace(" ", "-") + '_Others_Physical'
+                        tree.write(file)
+            for elem in root.iter('destination'):
+                for destinationname in elem.iter('name'):
+                    if destinationname.text == 'Others_Physical':
+                        destinationname.text = dom.getElementsByTagName('sources')[0].getElementsByTagName('source')[0].getElementsByTagName('name')[0].firstChild.nodeValue.replace(" ", "-") + '_Others_Physical'
+                        tree.write(file)
+
 
 if __name__ == "__main__":
     try:
