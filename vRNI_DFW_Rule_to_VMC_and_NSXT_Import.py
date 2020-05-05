@@ -134,10 +134,17 @@ class VMCRuleImport():
                     if sourcename.text == 'Others_Physical':
                         sourcename.text = dom.getElementsByTagName('destinations')[0].getElementsByTagName('destination')[0].getElementsByTagName('name')[0].firstChild.nodeValue.replace(" ", "-") + '_Others_Physical'
                         tree.write(file)
+                    if sourcename.text == 'Others_Virtual':
+                        sourcename.text = dom.getElementsByTagName('destinations')[0].getElementsByTagName('destination')[0].getElementsByTagName('name')[0].firstChild.nodeValue.replace(" ", "-") + '_Others_Virtual'
+                        tree.write(file)
             for elem in root.iter('destination'):
                 for destinationname in elem.iter('name'):
                     if destinationname.text == 'Others_Physical':
                         destinationname.text = dom.getElementsByTagName('sources')[0].getElementsByTagName('source')[0].getElementsByTagName('name')[0].firstChild.nodeValue.replace(" ", "-") + '_Others_Physical'
+                        tree.write(file)
+                for destinationname in elem.iter('name'):
+                    if destinationname.text == 'Others_Virtual':
+                        destinationname.text = dom.getElementsByTagName('sources')[0].getElementsByTagName('source')[0].getElementsByTagName('name')[0].firstChild.nodeValue.replace(" ", "-") + '_Others_Virtual'
                         tree.write(file)
 
     def gettoken(self):
@@ -349,7 +356,7 @@ class VMCRuleImport():
             destinationpath = None
             dom = minidom.parse(line)
             rulename =  dom.getElementsByTagName("name")[0].firstChild.nodeValue + "-vRNI-Import"
-            rulename = rulename.replace('[', '').replace(']', '').replace(' ', '')
+            rulename = rulename.replace('[', '').replace(']', '').replace(' ', '').replace('UFIREWALL_RULE-', '').replace('FIREWALL_RULE-', '')
             source =  dom.getElementsByTagName('sources')[0].getElementsByTagName('source')[0].getElementsByTagName('name')[0].firstChild.nodeValue.replace(" ", "-") + "-vRNI-Import-Tier" 
             for item in self.secgrouplist:
                 if source == item.get('section id'):
