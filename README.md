@@ -4,7 +4,7 @@ This python script allows you to import the recommended firewall rules made by v
 
 Export the recommended firewall rules from vRealize Network Insight in XML format (Security planner -> 3 dots in the top right -> Export as XML), then use this script to import.
 
-By default, the imported rules wil be in a disabled state. There will be no impact on network traffic right away, until you start enabling the firewall rules (or pass the `--enablerules` parameter).
+By default, the imported rules will be in a disabled state. There will be no impact on network traffic right away until you start enabling the firewall rules (or pass the `--enablerules` parameter).
 
 ## Demo
 
@@ -12,9 +12,9 @@ Watch Trey walk through the export of the recommended firewall rules and then im
 
 ## Installation
 
-Before you begin, some preresiquites:
+Before you begin, some prereqs:
 
-- Connectivity to the internet from where script will be executed
+- Connectivity to the internet from where the script will be executed
 - Connectivity to VMC SDDC over HTTPS (443)
 - Connectivity to NSX-T Manager or VIP over HTTPS (443)
 
@@ -67,7 +67,7 @@ optional arguments:
 
 ## VMware Cloud on AWS
 
-There are 2 output options for this script, one being VMware Cloud on AWS.
+There are two output options for this script, one being VMware Cloud on AWS.
 
 ```shell
 # python vRNI_DFW_Rule_to_VMC_and_NSXT_Import.py \
@@ -85,7 +85,7 @@ A working example can be found in the [demo video](https://youtu.be/JYeZpWk9cbk)
 
 1. Login to https://console.cloud.vmware.com/
 2. Click 'My Account' -> 'API Tokens' tab -> 'Generate Token' or Regenerate an existing token
-3. Token must have NSX Cloud Admin service role under VMC on AWS service.
+3. The token must have NSX Cloud Admin service role under VMC on AWS service.
 4. Copy token
 
 ### Getting the SDDC and Organisation ID
@@ -96,7 +96,7 @@ A working example can be found in the [demo video](https://youtu.be/JYeZpWk9cbk)
 
 ## VMware NSX-T
 
-There are 2 output options for this script, one being NSX-T Manager.
+There are two output options for this script, one being NSX-T Manager.
 
 ```shell
 # python vRNI_DFW_Rule_to_VMC_and_NSXT_Import.py \
