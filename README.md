@@ -10,6 +10,20 @@ By default, the imported rules wil be in a disabled state. There will be no impa
 
 Watch Trey walk through the export of the recommended firewall rules and then import into VMware Cloud on AWS, here: https://youtu.be/JYeZpWk9cbk
 
+## Installation
+
+Before you begin: you need Python (2 or 3) installed. Clone the repository to your local system:
+
+```shell
+git clone https://github.com/vrealize-network-insight/vrni-rule-import-vmc-nsxt.git
+```
+
+Then install the Python module prerequisites with:
+
+```shell
+pip install -r requirements.txt
+```
+
 ## Usage
 
 ```shell
