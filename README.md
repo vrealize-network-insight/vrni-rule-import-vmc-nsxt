@@ -12,7 +12,13 @@ Watch Trey walk through the export of the recommended firewall rules and then im
 
 ## Installation
 
-Before you begin: you need Python (2 or 3) installed. Clone the repository to your local system:
+Before you begin, some preresiquites:
+
+- Connectivity to the internet from where script will be executed
+- Connectivity to VMC SDDC over HTTPS (443)
+- Connectivity to NSX-T Manager or VIP over HTTPS (443)
+
+Then, clone the repository to your local system:
 
 ```shell
 git clone https://github.com/vrealize-network-insight/vrni-rule-import-vmc-nsxt.git
@@ -75,6 +81,19 @@ There are 2 output options for this script, one being VMware Cloud on AWS.
 
 A working example can be found in the [demo video](https://youtu.be/JYeZpWk9cbk).
 
+### Getting an API Token
+
+1. Login to https://console.cloud.vmware.com/
+2. Click 'My Account' -> 'API Tokens' tab -> 'Generate Token' or Regenerate an existing token
+3. Token must have NSX Cloud Admin service role under VMC on AWS service.
+4. Copy token
+
+### Getting the SDDC and Organisation ID
+
+1. Login to https://console.cloud.vmware.com/
+2. Select "VMware Cloud on AWS" under "My Services" -> Click desired SDDC -> Click Support
+3. Copy Org ID  and SDDC ID
+
 ## VMware NSX-T
 
 There are 2 output options for this script, one being NSX-T Manager.
@@ -87,6 +106,14 @@ There are 2 output options for this script, one being NSX-T Manager.
   --nsxturl "URL of NSX-T Manager or VIP" \
   --nsxtuser "NSX-T Username"
 ```
+
+## Exporting Recommended Firewall Rules from vRNI
+
+1. Log into vRNI
+2. Search for "Plan security of application NAME" (changing NAME to the application name you would like to secure)
+3. Select the three dots at the top right of the security donut diagram -> click "Export to XML"
+4. Unzip the .zip file
+5. Take note of the directory or folder location of the data center folder you will be importing rules for
 
 ## License
 
