@@ -21,6 +21,7 @@ from xml.dom import minidom
 from xml.dom.minidom import parse, parseString
 import xml.etree.ElementTree as ET
 import getpass
+import csv
 
 #IgnoreSelfSignedSSLCerts
 requests.packages.urllib3.disable_warnings(requests.packages.urllib3.exceptions.InsecureRequestWarning)
@@ -42,6 +43,7 @@ class VMCRuleImport():
             self.nsxtusername = None
             self.nsxtpassword = None
             self.nsxtauthvalues = None
+            self.csvfile = None
 
     def main(self):
         """Starting point for import process"""
@@ -56,6 +58,7 @@ class VMCRuleImport():
         parser.add_argument('--enablerules', action='store_false', help='Creates enabled firewall rules.  Default is disabled.')
         parser.add_argument('--nsxturl', '-n' , help='URL of NSX-T Manager or VIP')
         parser.add_argument('--nsxtuser', '-u', help='NSX-T Username')
+        parser.add_argument('--securitygroupcsv' , help="CSV File containing Security Group Members **For vRNI versions 6.2+**")
         args = parser.parse_args()
         if args.help:
             parser.print_help()
@@ -70,6 +73,7 @@ class VMCRuleImport():
         self.enablerules = args.enablerules
         self.nsxturl = args.nsxturl
         self.nsxtusername = args.nsxtuser
+        self.csvfile = args.securitygroupcsv
 
         targettype = input("Is target DFW NSX-T (1) or NSX on VMC (2).  Please input 1 for NSX-T or 2 for NSX on VMC: ")
         if targettype == '1':
@@ -79,7 +83,7 @@ class VMCRuleImport():
         if targettype == '2':
             self.vmc = True
             if self.verbose:
-                print("Your target destination for rules will be NSX-T")
+                print("Your target destination for rules will be VMC")
         if targettype != '1' and targettype != '2':
             print("Invalid argument, Please input 1 for NSX-T or 2 for NSX on VMC")
             sys.exit(1)
@@ -104,9 +108,17 @@ class VMCRuleImport():
             self.rulefolder = input('Please input rule folder location: ')
         if not self.applicationname:
             self.applicationname = input('Please input name of application for imported rules without spaces:  ')
+        if not self.csvfile:
+            while True:
+                creategroupsanswer = input('Would you like to populate created security groups with member IP addresses? **For vRNI versions 6.2 and up only** (y/n)')
+                if creategroupsanswer.lower() not in ('y', 'n'):
+                    print("Please answer with 'y' or 'n'")
+                else: 
+                    break
+            if creategroupsanswer.lower() == ('y'):
+                self.csvfile = input('Please input the location of the export-members.csv file')
 
     ### Functions run order ###
-        self.othersphysicalhandling()
         if self.vmc:
             self.gettoken()
             self.getproxyurls()
@@ -115,37 +127,15 @@ class VMCRuleImport():
         self.getsecuritygroups()
         self.parsetiers()
         self.createsecuritygroups()
-        self.getsecuritygroups()    
+        self.getsecuritygroups()  
+        if self.csvfile:
+            self.populatesecuritygroups()  
         self.getservicesdefinitions()
         self.creatservicesdefinitions()
         self.getservicesdefinitions()
         self.createrules()
 
     ### Functions to get existing configurations ###
-
-    def othersphysicalhandling(self):
-        files = [os.path.join(self.rulefolder, f) for f in listdir(self.rulefolder) if f.startswith("UFIRE") or f.startswith("FIRE")]
-        for file in files:
-            tree = ET.parse(file)
-            dom = minidom.parse(file)
-            root = tree.getroot()
-            for elem in root.iter('source'):
-                for sourcename in elem.iter('name'):
-                    if sourcename.text == 'Others_Physical':
-                        sourcename.text = dom.getElementsByTagName('destinations')[0].getElementsByTagName('destination')[0].getElementsByTagName('name')[0].firstChild.nodeValue.replace(" ", "-") + '_Others_Physical'
-                        tree.write(file)
-                    if sourcename.text == 'Others_Virtual':
-                        sourcename.text = dom.getElementsByTagName('destinations')[0].getElementsByTagName('destination')[0].getElementsByTagName('name')[0].firstChild.nodeValue.replace(" ", "-") + '_Others_Virtual'
-                        tree.write(file)
-            for elem in root.iter('destination'):
-                for destinationname in elem.iter('name'):
-                    if destinationname.text == 'Others_Physical':
-                        destinationname.text = dom.getElementsByTagName('sources')[0].getElementsByTagName('source')[0].getElementsByTagName('name')[0].firstChild.nodeValue.replace(" ", "-") + '_Others_Physical'
-                        tree.write(file)
-                for destinationname in elem.iter('name'):
-                    if destinationname.text == 'Others_Virtual':
-                        destinationname.text = dom.getElementsByTagName('sources')[0].getElementsByTagName('source')[0].getElementsByTagName('name')[0].firstChild.nodeValue.replace(" ", "-") + '_Others_Virtual'
-                        tree.write(file)
 
     def gettoken(self):
         authurl = 'https://console.cloud.vmware.com/csp/gateway/am/api/auth/api-tokens/authorize?refresh_token=%s' %(self.refreshtoken)
@@ -199,20 +189,38 @@ class VMCRuleImport():
                 print("Unable to get exisitng policy sections: Response: ", response.status_code, "\n")
 
     def getsecuritygroups(self):
-        if self.vmc:
-            infourl = '%s/policy/api/v1/infra/domains/cgw/groups' %(self.srevproxyurl)
-            headers = {'csp-auth-token': self.token, 'content-type': 'application/json'}
-            payload = {}
-            response = requests.get(infourl, headers=headers, data=payload)
-        if self.nsxt:
-            infourl = '%spolicy/api/v1/infra/domains/default/groups' %(self.nsxturl)
-            headers = {'content-type': 'application/json'}
-            payload = {}
-            response = requests.get(infourl, auth=self.nsxtauthvalues, verify=False, headers=headers, data=payload)
-        d = json.loads(response.text)
+        existinggroups = []
+        cursor = None
+        while True:
+            if self.vmc:
+                if not cursor:
+                    infourl = '%s/policy/api/v1/infra/domains/cgw/groups' %(self.srevproxyurl)
+                if cursor:
+                    infourl = '%s/policy/api/v1/infra/domains/cgw/groups?cursor=%s' %(self.srevproxyurl, cursor)
+                headers = {'csp-auth-token': self.token, 'content-type': 'application/json'}
+                payload = {}
+                response = requests.get(infourl, headers=headers, data=payload)
+                d = json.loads(response.text)
+                existinggroups = existinggroups + d["results"]
+                cursor = d.get('cursor', None)
+                if cursor == None:
+                    break
+            if self.nsxt:
+                if not cursor:
+                    infourl = '%spolicy/api/v1/infra/domains/default/groups' %(self.nsxturl)
+                if cursor:
+                    infourl = '%spolicy/api/v1/infra/domains/default/groups?cursor=%s' %(self.nsxturl, cursor)
+                headers = {'content-type': 'application/json'}
+                payload = {}
+                response = requests.get(infourl, auth=self.nsxtauthvalues, verify=False, headers=headers, data=payload)
+                d = json.loads(response.text)
+                existinggroups = existinggroups + d["results"]
+                cursor = d.get('cursor', None)
+                if cursor == None:
+                    break
         self.secgrouplist = []
         self.secgroupids = []
-        for item in d.get("results"):
+        for item in existinggroups:
             if item.get('id').endswith('-vRNI-Import-Tier'):
                 secid = item.get('id')
                 secpath = item.get('path')
@@ -225,18 +233,35 @@ class VMCRuleImport():
                 print("Unable to retrieve security groups. Response: ", response.status_code ,'\n')
 
     def getservicesdefinitions(self):
-        if self.vmc: 
-            infourl = '%s/policy/api/v1/infra/services' %(self.srevproxyurl)
-            headers = {'csp-auth-token': self.token, 'content-type': 'application/json'}
-            payload = {}
-            response = requests.get(infourl, headers=headers, data=payload)
-        if self.nsxt:
-            infourl = '%spolicy/api/v1/infra/services' %(self.nsxturl)
-            headers = {'content-type': 'application/json'}
-            payload = {}
-            response = requests.get(infourl, auth=self.nsxtauthvalues, verify=False, headers=headers, data=payload)
-        d = json.loads(response.text)
-        existingservices = d["results"]
+        existingservices = []
+        cursor = None
+        while True:
+            if self.vmc: 
+                if not cursor:
+                    infourl = '%s/policy/api/v1/infra/services' %(self.srevproxyurl)
+                if cursor:
+                    infourl = '%s/policy/api/v1/infra/services?cursor=%s' %(self.srevproxyurl, cursor)
+                headers = {'csp-auth-token': self.token, 'content-type': 'application/json'}
+                payload = {}
+                response = requests.get(infourl, headers=headers, data=payload)        
+                d = json.loads(response.text)
+                existingservices = existingservices + d["results"]
+                cursor = d.get('cursor', None)
+                if cursor == None:
+                    break
+            if self.nsxt:
+                if not cursor: 
+                    infourl = '%spolicy/api/v1/infra/services' %(self.nsxturl)
+                if cursor: 
+                    infourl = '%spolicy/api/v1/infra/services?cursor=%s' %(self.nsxturl, cursor)
+                headers = {'content-type': 'application/json'}
+                payload = {}
+                response = requests.get(infourl, auth=self.nsxtauthvalues, verify=False, headers=headers, data=payload)
+                d = json.loads(response.text)
+                existingservices = existingservices + d["results"]
+                cursor = d.get('cursor', None)
+                if cursor == None:
+                    break
         self.serviceslookup =[]
         self.existingservices =[]
         for rule in existingservices:
@@ -259,7 +284,7 @@ class VMCRuleImport():
     ### Functions for creating new VMC configurations ###
     def createsecuritygroups(self):
         if self.verbose:
-            print("******* \n Creating security groups. Please note: Created security groups are not populated with members. You will need to add Virtual Machines and IPs to created security groups as necessary. \n******* \n")
+            print("******* \n Creating security groups. \n******* \n")
         for tier in self.newsecgroups:
             tiername = tier + "-vRNI-Import-Tier"
             if tiername in self.secgroupids:
@@ -281,8 +306,51 @@ class VMCRuleImport():
                         print("Unable to create new security group " + tiername + ". Response: ", response.status_code, "\n")
                     else:
                         print("Security Group Created: " + tiername, "\n")
+    
+    def populatesecuritygroups(self):
+        if self.verbose:
+            print("******* \n Populating Creating security groups. \n******* \n")
+        name_regex1 = re.compile(r'([^ ]+) \[Application: ([^\]]+)]')
+        name_regex2 = re.compile(r'^Others_(.*)')
+        with open(self.csvfile) as csvfile:
+            reader = csv.DictReader(csvfile)
+            for row in reader:
+                # convert all list strings into lists, removing any empty items
+                modify = {k: list(filter(None, v.split(', '))) if k != 'Group Name' else v for k,v in row.items()}
+                match = name_regex1.match(modify.get('Group Name'))
+                match2 = name_regex2.match(modify.get('Group Name'))
+                if match:
+                    modify['Group Name'] = f'{match.group(2)}-{match.group(1)}-vRNI-Import-Tier'
+                if match2:
+                    modify['Group Name'] = f'Others-{match2.group(1)}-vRNI-Import-Tier'
+                if modify['Group Name'] in self.secgroupids:
+                    print('Populating security group ', modify['Group Name'], '\n')
+                    allips = modify['Virtual IPs']
+                    allips.extend(modify['Physical IPs'])
+                    if self.vmc:
+                        infourl = '%spolicy/api/v1/infra/domains/cgw/groups/%s' %(self.nsxpolicymanagerurl, modify['Group Name'])
+                        headers = {'Authorization': str('Bearer ' + self.token), 'content-type': 'application/json'}
+                        payload = {"expression": [{"ip_addresses": modify['Virtual IPs'], "resource_type": "IPAddressExpression"}]}
+                        response = requests.patch(infourl,headers=headers,data=json.dumps(payload))
+                        if self.verbose:
+                            if response.status_code != 200:
+                                print(response.content)
+                            else:
+                                print("Security Group populated with IPs: " , allips , "\n")
+                    if self.nsxt:
+                        infourl = '%spolicy/api/v1/infra/domains/default/groups/%s' %(self.nsxturl, modify['Group Name'])
+                        headers = {'content-type': 'application/json'}
+                        payload = {"expression": [{"ip_addresses": modify['Virtual IPs'], "resource_type": "IPAddressExpression"}]}
+                        response = requests.patch(infourl, auth=self.nsxtauthvalues, verify=False, headers=headers,data=json.dumps(payload))
+                        if self.verbose:
+                            if response.status_code != 200:
+                                print(response.content)
+                            else:
+                                print("Security Group populated with IPs: " , allips , "\n")
 
     def createfirewallrulesection(self):
+        if self.verbose:
+            print("******* \n Creating firewall rule section. \n******* \n")
         self.applicationid = self.applicationname + "-vRNIImport"
         if self.applicationid in self.communicationmaps:
             if self.verbose:
@@ -307,6 +375,8 @@ class VMCRuleImport():
                     print("Created policy section: ", self.sectionid, "\n")
 
     def creatservicesdefinitions(self):
+        if self.verbose:
+            print("******* \n Creating service definitions. \n******* \n")
         self.services = []
         for line in glob.glob(os.path.join(self.rulefolder,"*FIRE*.xml")):
             dom = minidom.parse(line)
@@ -349,6 +419,8 @@ class VMCRuleImport():
         self.newsecgroups = list(dict.fromkeys(self.newsecgroups))
 
     def createrules(self):
+        if self.verbose:
+            print("******* \n Creating rules. \n******* \n")
         for line in glob.glob(os.path.join(self.rulefolder,"*FIRE*.xml")):
             servicespatharray = []
             scope = []
@@ -396,3 +468,5 @@ if __name__ == "__main__":
         VMCRuleImport().main()
     except KeyboardInterrupt:
         pass
+        
+        
