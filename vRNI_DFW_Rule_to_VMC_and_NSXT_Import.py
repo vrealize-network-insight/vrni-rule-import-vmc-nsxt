@@ -322,7 +322,7 @@ class VMCRuleImport():
                 if match:
                     modify['Group Name'] = f'{match.group(2)}-{match.group(1)}-vRNI-Import-Tier'
                 if match2:
-                    modify['Group Name'] = f'Others-{match2.group(1)}-vRNI-Import-Tier'
+                    modify['Group Name'] = f'Others_{match2.group(1)}-vRNI-Import-Tier'
                 if modify['Group Name'] in self.secgroupids:
                     print('Populating security group ', modify['Group Name'], '\n')
                     allips = modify['Virtual IPs']
