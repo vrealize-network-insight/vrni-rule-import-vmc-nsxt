@@ -26,6 +26,9 @@ import csv
 #IgnoreSelfSignedSSLCerts
 requests.packages.urllib3.disable_warnings(requests.packages.urllib3.exceptions.InsecureRequestWarning)
 
+#Allow very large fields for CSV
+csv.field_size_limit(sys.maxsize)
+
 class VMCRuleImport():
     """Main class for importing VMC DFW Rules"""
     ### Arguments ###
