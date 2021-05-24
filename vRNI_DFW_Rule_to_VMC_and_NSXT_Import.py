@@ -321,6 +321,7 @@ class VMCRuleImport():
                 match2 = name_regex2.match(modify.get('Group Name'))
                 if match:
                     modify['Group Name'] = f'{match.group(2)}-{match.group(1)}-vRNI-Import-Tier'
+                    modify['Group Name'] = modify['Group Name'].replace(" ", "-")
                 if match2:
                     modify['Group Name'] = f'Others_{match2.group(1)}-vRNI-Import-Tier'
                 if modify['Group Name'] in self.secgroupids:
