@@ -27,7 +27,7 @@ import csv
 requests.packages.urllib3.disable_warnings(requests.packages.urllib3.exceptions.InsecureRequestWarning)
 
 #Allow very large fields for CSV
-csv.field_size_limit(sys.maxsize)
+csv.field_size_limit(100000000)
 
 class VMCRuleImport():
     """Main class for importing VMC DFW Rules"""
@@ -313,7 +313,7 @@ class VMCRuleImport():
     def populatesecuritygroups(self):
         if self.verbose:
             print("******* \n Populating Creating security groups. \n******* \n")
-        name_regex1 = re.compile(r'([^ ]+) \[Application: ([^\]]+)]')
+        name_regex1 = re.compile(r'(.*) \[Application: ([^\]]+)]')
         name_regex2 = re.compile(r'^Others_(.*)')
         with open(self.csvfile) as csvfile:
             reader = csv.DictReader(csvfile)
@@ -327,6 +327,7 @@ class VMCRuleImport():
                     modify['Group Name'] = modify['Group Name'].replace(" ", "-")
                 if match2:
                     modify['Group Name'] = f'Others_{match2.group(1)}-vRNI-Import-Tier'
+                    modify['Group Name'] = modify['Group Name'].replace(" ", "-")
                 if modify['Group Name'] in self.secgroupids:
                     print('Populating security group ', modify['Group Name'], '\n')
                     allips = modify['Virtual IPs']
