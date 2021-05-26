@@ -456,11 +456,15 @@ class VMCRuleImport():
                 infourl = '%spolicy/api/v1/infra/domains/cgw/communication-maps/%s/communication-entries/%s' %(self.nsxpolicymanagerurl, self.applicationid, rulename)
                 headers = {'Authorization': str('Bearer ' + self.token), 'content-type': 'application/json'}
                 payload = {"description": "comm entry", "display_name": rulename, "sequence_number": 1, "source_groups": sourcepath, "destination_groups": destinationpath, "services": servicespatharray, "action": "ALLOW", 'disabled': self.enablerules, "scope": scope}
+                if self.csvfile:
+                    payload = {"description": "comm entry", "display_name": rulename, "sequence_number": 1, "source_groups": sourcepath, "destination_groups": destinationpath, "services": servicespatharray, "action": "ALLOW", 'disabled': self.enablerules}
                 response = requests.put(infourl,headers=headers,data=json.dumps(payload))
             if self.nsxt:
                 infourl = '%spolicy/api/v1/infra/domains/default/communication-maps/%s/communication-entries/%s' %(self.nsxturl, self.applicationid, rulename)
                 headers = {'content-type': 'application/json'}
                 payload = {"description": "comm entry", "display_name": rulename, "sequence_number": 1, "source_groups": sourcepath, "destination_groups": destinationpath, "services": servicespatharray, "action": "ALLOW", 'disabled': self.enablerules, "scope": scope}
+                if self.csvfile:
+                    payload = {"description": "comm entry", "display_name": rulename, "sequence_number": 1, "source_groups": sourcepath, "destination_groups": destinationpath, "services": servicespatharray, "action": "ALLOW", 'disabled': self.enablerules}
                 response = requests.put(infourl,auth=self.nsxtauthvalues, verify=False, headers=headers,data=json.dumps(payload))
             if self.verbose:
                 if response.status_code == 200:
